@@ -4,12 +4,26 @@ import {
   motion,
   MotionConfig,
   useMotionValue,
+  useMotionValueEvent,
+  useReducedMotion,
   useSpring,
   useInView,
   useScroll,
   useTransform,
 } from "framer-motion";
 import "./styles.css";
+import {
+  OP_BOUNDARY,
+  OP_VEIL,
+  OP_WATER,
+  OP_ROADS_MAJOR,
+  OP_ROADS_MINOR,
+  OP_ROADS_LANE,
+  OP_PINS,
+  OP_SIM,
+  OP_LAKE_LABEL,
+  OP_SCALE_500M,
+} from "./map-data.js";
 
 /* ------------------------------------------------------------------ *
  * Content — sourced from the Sleipnir product docs (C2-App-154).
@@ -137,15 +151,9 @@ const specGroups = [
   ],
 ];
 
-// Coverage pins over the Ocean Park grounds. Coordinates are approximate,
-// derived from the seeded fleet homes; treat as illustrative.
-const coveragePins = [
-  ["Sao Biển subzone", "500+ shops", 30, 64, "hot"],
-  ["Vincom Ocean Park", "Retail anchor", 62, 38, "node"],
-  ["VinUniversity", "Campus depot", 26, 30, "node"],
-  ["Rainbow towers", "Residential", 70, 70, "node"],
-  ["Dormitory", "Student housing", 48, 50, "node"],
-];
+// Coverage pins over the Ocean Park grounds — projected from real
+// coordinates (OSM) in map-data.js; Vincom/VinUni/Sao Biển are exact.
+const coveragePins = OP_PINS;
 
 // Editorial pipeline — cards go live as the posts are published.
 const insights = [
@@ -872,20 +880,24 @@ function Flow() {
 function Fleet({ onSpec }) {
   return (
     <section id="fleet" className="section fleet">
-      <div className="fleet-head">
+      {/* Asymmetric split on desktop: the heading stays pinned on the left
+          while the roster scrolls by on the right. */}
+      <div className="fleet-inner">
+        <div className="fleet-head">
         <Reveal as="span" className="eyebrow" variant="left">
           The fleet
         </Reveal>
         <Reveal as="h2" className="section-title" variant="blur" delay={0.05}>
           Three couriers, one roster
         </Reveal>
-        <Reveal as="p" className="fleet-sub" delay={0.1}>
-          The dashboard, the dispatcher and the simulator all read the same roster, so everyone
-          agrees on who is where.
-        </Reveal>
-      </div>
+          <Reveal as="p" className="fleet-sub" delay={0.1}>
+            The dashboard, the dispatcher and the simulator all read the same roster, so everyone
+            agrees on who is where.
+          </Reveal>
+        </div>
 
-      <Stagger className="fleet-grid" gap={0.12}>
+        <div className="fleet-col">
+          <Stagger className="fleet-grid" gap={0.12}>
         {fleet.map((robot) => (
           <Item
             className="fleet-card"
@@ -930,31 +942,129 @@ function Fleet({ onSpec }) {
         ))}
       </Stagger>
 
-      <Reveal className="fleet-foot" variant="scale" delay={0.1}>
-        <button className="cta-line dark" type="button" onClick={onSpec}>
-          Read the full specification
-        </button>
-      </Reveal>
+          <Reveal className="fleet-foot" variant="scale" delay={0.1}>
+            <button className="cta-line dark" type="button" onClick={onSpec}>
+              Read the full specification
+            </button>
+          </Reveal>
+        </div>
+      </div>
     </section>
   );
 }
 
-// Illustrative geofence + street grid for the map panel (viewBox 0–100).
-const fenceD = "M 12 26 L 36 10 L 70 8 L 91 22 L 93 56 L 76 88 L 42 93 L 13 76 Z";
-const streetsD = [
-  "M 18 38 L 84 34",
-  "M 20 58 L 88 54",
-  "M 26 76 L 74 80",
-  "M 30 14 L 33 88",
-  "M 52 10 L 49 91",
-  "M 71 12 L 74 84",
-];
+/* Route simulation: an order runs Vincom anchor → Sao Biển on the REAL
+   street network (paths computed by Dijkstra over the OSM road graph in
+   build-map.mjs — the detour is an actual alternative street route).
+   Scrubbed by the section's scroll progress (tall sticky runway). */
+const simLegA = OP_SIM.legA; // Vincom → the junction that blocks
+const simBlockedEdge = OP_SIM.blocked; // the blocked corridor ahead
+const simDetour = OP_SIM.detour; // real alternative route to Sao Biển
+
+// Timeline on progress p: approach 0–.40 (blocked flag at .36), pause
+// .40–.46, reroute draw .46–.56, detour .56–.96, arrived ≥.96.
+function simPhase(p) {
+  if (p >= 0.96) return "arrived";
+  if (p >= 0.56) return "detour";
+  if (p >= 0.46) return "rerouting";
+  if (p >= 0.36) return "blocked";
+  return "enroute";
+}
+const simStatus = {
+  enroute: "EN ROUTE",
+  blocked: "EDGE BLOCKED",
+  rerouting: "REROUTING…",
+  detour: "EN ROUTE · DETOUR",
+  arrived: "DELIVERED",
+};
+
+function formatEta(seconds) {
+  const s = Math.max(0, Math.round(seconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
 
 function Coverage() {
   const [openPin, setOpenPin] = useState(null);
+  const [phase, setPhase] = useState("enroute");
+  const sectionRef = useRef(null);
+  const legARef = useRef(null);
+  const detourRef = useRef(null);
+  const dotRef = useRef(null);
+  const tagRef = useRef(null);
+  const etaRef = useRef(null);
+  const reduced = useReducedMotion();
+
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start start", "end end"],
+  });
+
+  // Dot, traces and ETA update straight on the DOM — only the phase label
+  // goes through React (5 transitions per run).
+  const applyProgress = (p) => {
+    const legA = legARef.current;
+    const detour = detourRef.current;
+    const dot = dotRef.current;
+    if (!legA || !detour || !dot) return;
+    const aLen = legA.getTotalLength();
+    const dLen = detour.getTotalLength();
+
+    let point;
+    if (p < 0.4) {
+      const t = p / 0.4;
+      point = legA.getPointAtLength(t * aLen);
+      legA.style.strokeDashoffset = 100 * (1 - t); // pathLength="100"
+      detour.style.strokeDashoffset = 100;
+    } else if (p < 0.56) {
+      point = legA.getPointAtLength(aLen); // the ~0.3s "calm pause"
+      legA.style.strokeDashoffset = 0;
+      const t = Math.min(1, Math.max(0, (p - 0.46) / 0.1));
+      detour.style.strokeDashoffset = 100 * (1 - t);
+    } else {
+      const t = Math.min(1, (p - 0.56) / 0.4);
+      point = detour.getPointAtLength(t * dLen);
+      legA.style.strokeDashoffset = 0;
+      detour.style.strokeDashoffset = 0;
+    }
+    dot.setAttribute("cx", point.x);
+    dot.setAttribute("cy", point.y);
+    if (tagRef.current) {
+      tagRef.current.style.left = `${point.x}%`;
+      tagRef.current.style.top = `${point.y}%`;
+    }
+
+    if (etaRef.current) {
+      let eta;
+      if (p < 0.36) eta = formatEta(252 - (p / 0.4) * 130);
+      else if (p < 0.56) eta = "--:--"; // recomputing
+      else if (p < 0.96) eta = formatEta(150 * (1 - (p - 0.56) / 0.4));
+      else eta = "0:00";
+      etaRef.current.textContent = eta;
+    }
+    setPhase(simPhase(p));
+  };
+
+  useMotionValueEvent(scrollYProgress, "change", (p) => {
+    if (!reduced) applyProgress(p);
+  });
+
+  // First paint, and reduced motion: settle to a sensible state (final
+  // completed route when the user asked for no motion).
+  useEffect(() => {
+    applyProgress(reduced ? 1 : scrollYProgress.get());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reduced]);
+
+  const alertVisible = phase === "blocked" || phase === "rerouting" || phase === "detour" || phase === "arrived";
+
   return (
-    <section id="coverage" className="section coverage">
-      <div className="coverage-inner">
+    <section
+      id="coverage"
+      ref={sectionRef}
+      className={`section coverage ${reduced ? "is-static" : ""}`}
+    >
+      <div className="coverage-sticky">
+        <div className="coverage-inner">
         <div className="coverage-copy">
           <Reveal as="span" className="eyebrow" variant="left">
             Coverage
@@ -986,18 +1096,24 @@ function Coverage() {
             <span className="map-corner bl" />
             <span className="map-corner br" />
             <div className="map-grid" aria-hidden="true" />
-            <svg className="map-fence" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-              <g className="map-streets">
-                {streetsD.map((d) => (
-                  <path key={d} d={d} />
+            {/* Real geography — lakes, street network and boundary of
+                Vinhomes Ocean Park 1, projected from OSM data. */}
+            <svg className="map-geo" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <g className="geo-water">
+                {OP_WATER.map((d, i) => (
+                  <path key={i} d={d} />
                 ))}
               </g>
-              <path className="fence-dash" d={fenceD} />
+              <path className="geo-roads geo-lane" d={OP_ROADS_LANE} />
+              <path className="geo-roads geo-minor" d={OP_ROADS_MINOR} />
+              <path className="geo-roads geo-major" d={OP_ROADS_MAJOR} />
+              <path className="geo-veil" d={OP_VEIL} />
+              <path className="fence-dash" d={OP_BOUNDARY} />
               {/* Solid trace draws the fence once, then settles so the
                   dashed boundary underneath stays the resting state. */}
               <motion.path
                 className="fence-draw"
-                d={fenceD}
+                d={OP_BOUNDARY}
                 initial={{ pathLength: 0, opacity: 0.85 }}
                 whileInView={{ pathLength: 1, opacity: [0.85, 0.85, 0.3] }}
                 viewport={{ once: true, amount: 0.4 }}
@@ -1007,9 +1123,56 @@ function Coverage() {
                 }}
               />
             </svg>
-            <svg className="map-routes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-              <path d="M26 30 L48 50 L62 38 M48 50 L30 64 M48 50 L70 70" />
+            {OP_LAKE_LABEL && (
+              <span
+                className="map-lake-label"
+                style={{ left: `${OP_LAKE_LABEL.x}%`, top: `${OP_LAKE_LABEL.y}%` }}
+                aria-hidden="true"
+              >
+                Hồ Biển Mặn
+              </span>
+            )}
+            <svg className="map-sim" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <path
+                className={`sim-blocked ${
+                  phase === "blocked" || phase === "rerouting"
+                    ? "is-hot"
+                    : phase === "detour" || phase === "arrived"
+                      ? "is-dim"
+                      : ""
+                }`}
+                d={simBlockedEdge}
+              />
+              <path ref={legARef} className="sim-trace" d={simLegA} pathLength="100" />
+              <path ref={detourRef} className="sim-trace" d={simDetour} pathLength="100" />
+              <circle ref={dotRef} className="sim-dot" r="1.2" cx={OP_SIM.start[0]} cy={OP_SIM.start[1]} />
             </svg>
+            {/* The dot is R-02 — the roster's "Delivering · live demo route" unit. */}
+            <span
+              ref={tagRef}
+              className="sim-tag"
+              style={{ left: `${OP_SIM.start[0]}%`, top: `${OP_SIM.start[1]}%` }}
+              aria-hidden="true"
+            >
+              R-02
+            </span>
+            {alertVisible && (
+              <div
+                className={`map-alert ${phase === "detour" || phase === "arrived" ? "is-muted" : ""}`}
+                style={{ left: `${OP_SIM.blockAt[0]}%`, top: `${OP_SIM.blockAt[1]}%` }}
+                aria-hidden="true"
+              >
+                <span className="alert-dot" /> Edge blocked
+              </div>
+            )}
+            <div className="map-telemetry" role="status">
+              <span className="tele-label">ETA</span>
+              <span className="tele-value" ref={etaRef}>
+                4:12
+              </span>
+              <span className="tele-label">· 13K NODES ·</span>
+              <span className={`tele-status is-${phase}`}>{simStatus[phase]}</span>
+            </div>
             <Stagger className="map-pins-layer" delay={0.6} gap={0.13}>
               {coveragePins.map(([label, sub, x, y, kind]) => (
                 <Item
@@ -1036,8 +1199,22 @@ function Coverage() {
               <span>105.944° E</span>
               <span>OCEAN PARK 1</span>
             </div>
+            <div className="map-instruments" aria-hidden="true">
+              <span className="map-north">
+                <svg viewBox="0 0 10 12" aria-hidden="true">
+                  <path d="M5 0 L9 11 L5 8.4 L1 11 Z" />
+                </svg>
+                N
+              </span>
+              <span className="map-scale" style={{ width: `${OP_SCALE_500M}%` }}>
+                <i />
+                500 m
+              </span>
+            </div>
+            <span className="map-attr">Map data © OpenStreetMap</span>
           </div>
         </Reveal>
+        </div>
       </div>
     </section>
   );
@@ -1275,18 +1452,44 @@ function Footer() {
 }
 
 function Modal({ open, onClose }) {
+  const panelRef = useRef(null);
+
   useEffect(() => {
     if (!open) return;
-    const onKey = (e) => e.key === "Escape" && onClose();
+    const previouslyFocused = document.activeElement;
+    const focusables = () =>
+      [...panelRef.current.querySelectorAll("button, a[href], input, textarea, select, [tabindex]:not([tabindex='-1'])")].filter(
+        (el) => !el.disabled
+      );
+    focusables()[0]?.focus();
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+      if (e.key !== "Tab") return;
+      // Trap Tab inside the panel.
+      const items = focusables();
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || !panelRef.current.contains(document.activeElement))) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      previouslyFocused?.focus?.();
+    };
   }, [open, onClose]);
 
   if (!open) return null;
   return (
     <div className="modal" role="dialog" aria-modal="true" aria-label="Full specification">
-      <button className="modal-backdrop" type="button" aria-label="Close" onClick={onClose} />
-      <aside className="modal-panel">
+      <button className="modal-backdrop" type="button" aria-label="Close" onClick={onClose} tabIndex={-1} />
+      <aside className="modal-panel" ref={panelRef}>
         <button className="modal-close" type="button" aria-label="Close" onClick={onClose}>
           <span />
           <span />
@@ -1333,12 +1536,12 @@ function PrivacyPage() {
         </h1>
         <div className="privacy-copy">
           <p>
-            This is a placeholder privacy page so the footer navigation stays functional. Replace it
-            with your legal copy before production.
+            This site does not collect personal data. There are no analytics scripts, no tracking
+            cookies and no third-party embeds.
           </p>
           <p>
-            The demo does not collect personal data. Any form on this site is illustrative — nothing
-            is stored or sent.
+            Enquiries reach us at hello@sleipnir.example and are used only to respond to you —
+            nothing is stored beyond the mailbox, and nothing is shared.
           </p>
           <button className="cta-line dark" type="button" onClick={() => (window.location.href = "/")}>
             Back to home

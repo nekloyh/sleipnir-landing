@@ -16,6 +16,9 @@
       property="og:description"
       content="Autonomous last-mile delivery inside gated communities. Delivery-as-a-Service, proven in simulation at Vinhomes Ocean Park 1."
     />
+    <!-- TODO: og:image/twitter:image must become ABSOLUTE URLs once the
+         production domain exists (e.g. https://<domain>/og.jpg) — link
+         scrapers ignore relative image paths. -->
     <meta property="og:image" content="/og.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Sleipnir — The courier that never stumbles" />
@@ -34,6 +37,75 @@
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <style>
+        .nojs {
+          position: fixed;
+          inset: 0;
+          overflow-y: auto;
+          background: #09231b;
+          color: #eaf6ef;
+          font-family: "Inter", system-ui, sans-serif;
+          line-height: 1.65;
+          padding: 48px 24px 64px;
+        }
+        .nojs-inner { max-width: 640px; margin: 0 auto; }
+        .nojs h1 {
+          font-family: "Space Grotesk", system-ui, sans-serif;
+          font-size: clamp(2rem, 6vw, 3.4rem);
+          line-height: 1.05;
+          letter-spacing: -0.03em;
+          margin: 18px 0 20px;
+        }
+        .nojs h1 em { font-style: normal; color: #cbf96e; }
+        .nojs p { margin: 0 0 16px; color: #bbd1c5; }
+        .nojs strong { color: #eaf6ef; }
+        .nojs a { color: #cbf96e; }
+        .nojs .nojs-brand {
+          font-family: "Space Grotesk", system-ui, sans-serif;
+          font-weight: 700;
+          color: #eaf6ef;
+          letter-spacing: 0.02em;
+        }
+        .nojs .nojs-steps {
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: 13px;
+          color: #cbf96e;
+          margin: 20px 0;
+        }
+        .nojs .nojs-note {
+          margin-top: 32px;
+          font-size: 13px;
+          color: #8ba79a;
+          border-top: 1px solid rgba(234, 246, 239, 0.14);
+          padding-top: 16px;
+        }
+      </style>
+      <div class="nojs">
+        <div class="nojs-inner">
+          <p class="nojs-brand">◉ Sleipnir</p>
+          <h1>The courier <em>that never stumbles</em></h1>
+          <p>
+            Sleipnir runs last-mile delivery end to end inside gated communities — it picks the
+            robot, routes around blockages, and explains every decision.
+          </p>
+          <p>
+            Not a chatbot, not a taxi: an operations brain and the robot fleet it drives —
+            Delivery-as-a-Service for the last hundred meters, proven in simulation at
+            <strong>Vinhomes Ocean Park 1</strong> (66 towers, 3,500 low-rise homes, 423
+            hectares, 500+ on-site shops).
+          </p>
+          <p class="nojs-steps">01 Order · 02 Dispatch · 03 Handoff · 04 Track &amp; reroute · 05 Pickup code</p>
+          <p>
+            Book a pilot: <a href="mailto:hello@sleipnir.example">hello@sleipnir.example</a>
+          </p>
+          <p class="nojs-note">
+            The full interactive experience — live fleet roster, coverage map and route
+            simulation — needs JavaScript enabled.
+          </p>
+        </div>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -38,6 +38,7 @@
 
   /* Semantic (rationed — match the robot's own lights) */
   --amber: #9b5a00;
+  --amber-2: #e9a952; /* amber tint legible on the dark map */
   --red: #b3263a;
   --info: #256ea8;
 
@@ -1274,13 +1275,16 @@ button {
   color: #08766b;
   background: #dcf3ef;
 }
+/* Delivering = the "live" state → lime family (4.92:1); Charging = energy
+   input → amber, matching the spec drawer's TBD chips (4.84:1). Keeps the
+   whole site inside the green/amber palette — no stray blue. */
 .status-delivering {
-  color: var(--info);
-  background: #ddeeff;
-}
-.status-charging {
   color: #557200;
   background: #eef5d6;
+}
+.status-charging {
+  color: var(--amber);
+  background: #fff0d2;
 }
 .fleet-img-wrap {
   aspect-ratio: 4 / 3;
@@ -1294,6 +1298,14 @@ button {
   width: 82%;
   filter: drop-shadow(0 18px 24px rgba(16, 59, 47, 0.22));
   transition: transform 0.4s var(--ease);
+}
+/* The three renders (front/side/rear) frame the robot at different sizes —
+   equalize apparent mass across the row. */
+.fleet-card:nth-child(1) .fleet-img {
+  width: 94%;
+}
+.fleet-card:nth-child(3) .fleet-img {
+  width: 88%;
 }
 .fleet-card:hover .fleet-img {
   transform: scale(1.05);
@@ -1353,6 +1365,51 @@ button {
 .fleet-foot {
   margin-top: 36px;
 }
+/* Desktop: asymmetric split — pinned heading left, roster scrolling right,
+   cards flipped horizontal (render left, telemetry right). */
+@media (min-width: 1025px) {
+  .fleet-inner {
+    display: grid;
+    grid-template-columns: 0.72fr 1.28fr;
+    gap: clamp(32px, 4vw, 72px);
+    align-items: start;
+  }
+  .fleet-head {
+    position: sticky;
+    top: 120px;
+    margin-bottom: 0;
+    max-width: none;
+  }
+  .fleet-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .fleet-card {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    column-gap: 28px;
+    align-items: center;
+  }
+  .fleet-card .fleet-img-wrap {
+    grid-column: 1;
+    grid-row: 1 / 6;
+    aspect-ratio: 1 / 1;
+    margin: 0;
+  }
+  .fleet-card .fleet-card-top,
+  .fleet-card .fleet-name,
+  .fleet-card .fleet-home,
+  .fleet-card .fleet-battery,
+  .fleet-card .fleet-note {
+    grid-column: 2;
+  }
+  .fleet-card .fleet-name {
+    margin-top: 10px;
+  }
+  .fleet-foot {
+    margin-top: 26px;
+  }
+}
 
 /* ================================================================
    COVERAGE
@@ -1360,6 +1417,29 @@ button {
 .coverage {
   background: linear-gradient(180deg, var(--forest) 0%, var(--pine) 100%);
   color: var(--inverse);
+  /* Tall runway: the pinned map scrubs the route simulation while the
+     user scrolls the extra ~140vh. */
+  min-height: 240vh;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.coverage.is-static {
+  min-height: 0;
+}
+.coverage-sticky {
+  position: sticky;
+  top: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  padding: clamp(48px, 7vw, 110px) 0;
+}
+.coverage.is-static .coverage-sticky {
+  position: static;
+  min-height: 0;
+}
+.coverage-sticky > .coverage-inner {
+  width: 100%;
 }
 .coverage .eyebrow {
   color: var(--lime);
@@ -1430,29 +1510,39 @@ button {
     linear-gradient(90deg, color-mix(in srgb, var(--inverse) 7%, transparent) 1px, transparent 1px);
   background-size: 7% 7%;
 }
-.map-routes {
+/* Real geography (OSM): lakes, three road tiers, boundary. The veil dims
+   everything outside the geofence so the service area reads instantly. */
+.map-geo {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
 }
-.map-routes path {
-  fill: none;
-  stroke: color-mix(in srgb, var(--lime) 45%, transparent);
-  stroke-width: 0.5;
-  stroke-dasharray: 2 2;
+.geo-water path {
+  fill: color-mix(in srgb, var(--mint) 9%, #041710);
+  stroke: color-mix(in srgb, var(--mint) 28%, transparent);
+  stroke-width: 0.25;
 }
-/* Geofence boundary + street network — the "fully mapped" claim, drawn. */
-.map-fence {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-.map-streets path {
+.geo-roads {
   fill: none;
-  stroke: color-mix(in srgb, var(--inverse) 11%, transparent);
-  stroke-width: 0.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.geo-lane {
+  stroke: color-mix(in srgb, var(--inverse) 7%, transparent);
+  stroke-width: 0.22;
+}
+.geo-minor {
+  stroke: color-mix(in srgb, var(--inverse) 15%, transparent);
+  stroke-width: 0.32;
+}
+.geo-major {
+  stroke: color-mix(in srgb, var(--inverse) 30%, transparent);
+  stroke-width: 0.55;
+}
+.geo-veil {
+  fill: color-mix(in srgb, #061a14 62%, transparent);
+  fill-rule: evenodd;
 }
 .fence-dash {
   fill: color-mix(in srgb, var(--lime) 4%, transparent);
@@ -1465,6 +1555,168 @@ button {
   stroke: var(--lime);
   stroke-width: 0.5;
   opacity: 0.8;
+}
+/* Route simulation layers */
+.map-sim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.sim-trace {
+  fill: none;
+  stroke: var(--lime);
+  stroke-width: 0.7;
+  stroke-dasharray: 100; /* with pathLength="100", offset is a percent */
+  stroke-dashoffset: 100;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--lime) 55%, transparent));
+}
+.sim-blocked {
+  fill: none;
+  stroke: var(--amber-2);
+  stroke-width: 0.6;
+  stroke-dasharray: 2 1.4;
+  opacity: 0;
+  transition: opacity 0.3s var(--ease);
+}
+.sim-blocked.is-hot {
+  opacity: 1;
+}
+.sim-blocked.is-dim {
+  opacity: 0.35;
+}
+.sim-dot {
+  fill: var(--lime);
+  filter: drop-shadow(0 0 5px var(--lime));
+}
+/* R-02 tag rides along with the sim dot (HTML overlay — text inside the
+   stretched SVG would distort). */
+.sim-tag {
+  position: absolute;
+  transform: translate(10px, -50%);
+  z-index: 3;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--lime);
+  background: color-mix(in srgb, var(--pine) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--lime) 30%, transparent);
+  border-radius: 5px;
+  padding: 2px 5px;
+  pointer-events: none;
+}
+.map-lake-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--mint) 55%, transparent);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.map-instruments {
+  position: absolute;
+  right: 14px;
+  bottom: 30px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--inverse-2);
+  pointer-events: none;
+}
+.map-north {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.map-north svg {
+  width: 7px;
+  height: 9px;
+  fill: var(--inverse-2);
+}
+.map-scale {
+  text-align: center;
+}
+.map-scale i {
+  display: block;
+  height: 4px;
+  margin-bottom: 3px;
+  border-left: 1px solid currentColor;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+}
+.map-attr {
+  position: absolute;
+  right: 32px;
+  bottom: 13px;
+  z-index: 3;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  color: color-mix(in srgb, var(--inverse) 34%, transparent);
+  pointer-events: none;
+}
+.map-alert {
+  position: absolute;
+  transform: translate(-50%, -140%);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--amber-2);
+  background: color-mix(in srgb, var(--pine) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amber-2) 45%, transparent);
+  border-radius: 100px;
+  padding: 4px 9px;
+  backdrop-filter: blur(4px);
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.map-alert.is-muted {
+  opacity: 0.55;
+}
+.alert-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber-2);
+  flex: none;
+}
+.map-telemetry {
+  position: absolute;
+  top: 16px;
+  left: 18px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: color-mix(in srgb, var(--lime) 85%, white);
+}
+.map-telemetry .tele-label {
+  color: var(--inverse-2);
+  font-weight: 400;
+}
+.map-telemetry .tele-status.is-blocked,
+.map-telemetry .tele-status.is-rerouting {
+  color: var(--amber-2);
 }
 .map-corner {
   position: absolute;
@@ -2243,6 +2495,16 @@ button {
   }
 }
 
+/* Tablet band: 2-col grids with odd item counts — the straggler card
+   spans the full row instead of sitting orphaned in the left column. */
+@media (min-width: 621px) and (max-width: 1024px) {
+  .fleet-grid > .fleet-card:last-child:nth-child(odd),
+  .insights-row > .insight-card:last-child:nth-child(odd),
+  .flow-track > .flow-step:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 860px) {
   .desktop-nav,
   .header-actions {
@@ -2268,6 +2530,11 @@ button {
   .coverage-inner,
   .contact-inner {
     grid-template-columns: 1fr;
+  }
+  /* Pinned sim: keep the whole column visible under the fixed header. */
+  .coverage-sticky {
+    align-items: flex-start;
+    padding: 88px 0 24px;
   }
   .anatomy-stage {
     order: -1;

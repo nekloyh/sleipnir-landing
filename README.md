@@ -39,17 +39,24 @@ roster (R-01 Library Runner, R-02 Vincom Scout, R-03 VinUni Courier).
 
 Anything **not yet verified against hardware** is shown as an explicit
 placeholder — the chassis specs in the specification drawer render as `TBD`
-badges, the field-note cards carry a "Placeholder" tag, and the contact form
-states it does not store or send submissions.
+badges and the field-note cards carry a "Coming soon" tag.
 
 ## Assets
 
-The six robot renders (`public/robots/*.png`) are the product's own transparent
-hero images. No third-party media is bundled.
+The six robot renders ship as WebP (`public/robots/*.webp`). The original PNG
+masters live in `assets-src/robots/` and are **not** bundled into `dist/`.
+Regenerate the derived assets from the masters with:
+
+```bash
+for f in assets-src/robots/*.png; do magick "$f" -quality 82 "public/robots/$(basename "${f%.png}").webp"; done
+magick -size 1200x630 xc:"#09231B" \( assets-src/robots/robot-hero.png -resize 700x \) -gravity center -composite -quality 84 public/og.jpg
+```
+
+No third-party media is bundled.
 
 ## Sections
 
 Loader · hero (robot + live telemetry) · thesis · Ocean Park stat band · product
-anatomy (interactive hotspots) · five-step flow · fleet roster · coverage map ·
-field notes · book-a-pilot contact · footer — plus a specification drawer and a
-placeholder privacy page.
+anatomy (interactive hotspots) · five-step flow · fleet roster · coverage map
+with a scroll-scrubbed route simulation · field notes · book-a-pilot contact ·
+footer — plus a specification drawer and a privacy page.
