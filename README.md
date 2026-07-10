@@ -54,6 +54,18 @@ magick -size 1200x630 xc:"#09231B" \( assets-src/robots/robot-hero.png -resize 7
 
 No third-party media is bundled.
 
+The coverage map (`src/map-data.js`) is real geography — the boundary, lakes
+and street network of Vinhomes Ocean Park 1, projected from OpenStreetMap data
+(© OpenStreetMap contributors, ODbL). The route simulation runs on the actual
+street graph (Dijkstra, with the detour recomputed around the blocked edge).
+Regenerate with:
+
+```bash
+# fetch fresh OSM data, then rebuild src/map-data.js
+curl -X POST --data-urlencode "data@assets-src/overpass.ql" https://overpass-api.de/api/interpreter -o /tmp/osm.json
+node assets-src/build-map.mjs   # reads osm.json (adjust the path inside if needed)
+```
+
 ## Sections
 
 Loader · hero (robot + live telemetry) · thesis · Ocean Park stat band · product

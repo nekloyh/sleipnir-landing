@@ -1504,10 +1504,10 @@ button {
   position: absolute;
   inset: 0;
   background-image: linear-gradient(
-      color-mix(in srgb, var(--inverse) 7%, transparent) 1px,
+      color-mix(in srgb, var(--inverse) 4%, transparent) 1px,
       transparent 1px
     ),
-    linear-gradient(90deg, color-mix(in srgb, var(--inverse) 7%, transparent) 1px, transparent 1px);
+    linear-gradient(90deg, color-mix(in srgb, var(--inverse) 4%, transparent) 1px, transparent 1px);
   background-size: 7% 7%;
 }
 /* Real geography (OSM): lakes, three road tiers, boundary. The veil dims
@@ -1519,9 +1519,9 @@ button {
   height: 100%;
 }
 .geo-water path {
-  fill: color-mix(in srgb, var(--mint) 9%, #041710);
-  stroke: color-mix(in srgb, var(--mint) 28%, transparent);
-  stroke-width: 0.25;
+  fill: color-mix(in srgb, var(--mint) 19%, #07241a);
+  stroke: color-mix(in srgb, var(--mint) 45%, transparent);
+  stroke-width: 0.3;
 }
 .geo-roads {
   fill: none;
@@ -1544,17 +1544,19 @@ button {
   fill: color-mix(in srgb, #061a14 62%, transparent);
   fill-rule: evenodd;
 }
+/* Boundary is quiet context in mint — lime stays reserved for the live
+   route and pins. */
 .fence-dash {
-  fill: color-mix(in srgb, var(--lime) 4%, transparent);
-  stroke: color-mix(in srgb, var(--lime) 28%, transparent);
-  stroke-width: 0.35;
+  fill: none;
+  stroke: color-mix(in srgb, var(--mint) 38%, transparent);
+  stroke-width: 0.28;
   stroke-dasharray: 1.6 1.2;
 }
 .fence-draw {
   fill: none;
-  stroke: var(--lime);
-  stroke-width: 0.5;
-  opacity: 0.8;
+  stroke: var(--mint);
+  stroke-width: 0.3;
+  opacity: 0.6;
 }
 /* Route simulation layers */
 .map-sim {
@@ -1574,9 +1576,11 @@ button {
 .sim-blocked {
   fill: none;
   stroke: var(--amber-2);
-  stroke-width: 0.6;
-  stroke-dasharray: 2 1.4;
+  stroke-width: 0.9;
+  stroke-linecap: round;
+  stroke-dasharray: 2.2 1.5;
   opacity: 0;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--amber-2) 60%, transparent));
   transition: opacity 0.3s var(--ease);
 }
 .sim-blocked.is-hot {
@@ -1614,37 +1618,32 @@ button {
   font-size: 8px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--mint) 55%, transparent);
+  color: color-mix(in srgb, var(--soft) 75%, transparent);
+  text-shadow: 0 0 4px rgba(4, 18, 13, 0.9);
   white-space: nowrap;
   pointer-events: none;
 }
 .map-instruments {
   position: absolute;
-  right: 14px;
-  bottom: 30px;
+  right: 16px;
+  bottom: 32px;
   z-index: 3;
   display: flex;
-  flex-direction: column;
   align-items: flex-end;
-  gap: 7px;
+  gap: 12px;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 8px;
   letter-spacing: 0.1em;
   color: var(--inverse-2);
   pointer-events: none;
+  white-space: nowrap;
 }
 .map-north {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.map-north svg {
-  width: 7px;
-  height: 9px;
-  fill: var(--inverse-2);
+  letter-spacing: 0.16em;
 }
 .map-scale {
   text-align: center;
+  min-width: 56px;
 }
 .map-scale i {
   display: block;
@@ -1656,18 +1655,19 @@ button {
 }
 .map-attr {
   position: absolute;
-  right: 32px;
-  bottom: 13px;
+  right: 16px;
+  bottom: 16px;
   z-index: 3;
   font-family: var(--font-mono);
-  font-size: 8px;
-  letter-spacing: 0.06em;
-  color: color-mix(in srgb, var(--inverse) 34%, transparent);
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  color: color-mix(in srgb, var(--inverse) 32%, transparent);
   pointer-events: none;
+  white-space: nowrap;
 }
 .map-alert {
   position: absolute;
-  transform: translate(-50%, -140%);
+  transform: translate(-50%, -175%);
   z-index: 3;
   display: inline-flex;
   align-items: center;
@@ -1753,11 +1753,13 @@ button {
 }
 .pin-core {
   display: block;
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
-  background: var(--green);
+  background: var(--mint);
   border: 1.5px solid var(--pine);
+  /* halo separates the pin from the busy street fabric underneath */
+  box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--pine) 85%, transparent);
 }
 .pin-hot .pin-core {
   background: var(--lime);
@@ -2570,6 +2572,12 @@ button {
   }
   .hero-eyebrow .eyebrow-ext {
     display: none;
+  }
+  /* keep OSM attribution clear of the coordinate readout on narrow maps */
+  .map-attr {
+    bottom: 3px;
+    right: 10px;
+    font-size: 6px;
   }
   .telemetry-chip {
     display: none;

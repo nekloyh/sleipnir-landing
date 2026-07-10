@@ -1200,15 +1200,10 @@ function Coverage() {
               <span>OCEAN PARK 1</span>
             </div>
             <div className="map-instruments" aria-hidden="true">
-              <span className="map-north">
-                <svg viewBox="0 0 10 12" aria-hidden="true">
-                  <path d="M5 0 L9 11 L5 8.4 L1 11 Z" />
-                </svg>
-                N
-              </span>
+              <span className="map-north">▲ N</span>
               <span className="map-scale" style={{ width: `${OP_SCALE_500M}%` }}>
                 <i />
-                500 m
+                500&nbsp;m
               </span>
             </div>
             <span className="map-attr">Map data © OpenStreetMap</span>
